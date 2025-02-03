@@ -7,9 +7,10 @@ import 'dart:io';
 import 'package:path_provider/path_provider.dart'; // Add this line for path_provider
 import 'package:google_fonts/google_fonts.dart';
 import 'package:gradient_borders/box_borders/gradient_box_border.dart';
-import 'dart:math';
 import 'dart:core';
 import 'package:intl/intl.dart';
+import 'utils.dart';
+import 'package:audio_session/audio_session.dart';
 
 class ChatPage extends StatefulWidget {
   static const routeName = '/chat';
@@ -22,11 +23,11 @@ class ChatPage extends StatefulWidget {
 class _ChatPageState extends State<ChatPage> {
   final ScrollController _scrollController = ScrollController();
   List<Map<String, dynamic>> _chatHistory = [];
-  late FlutterSoundRecorder _soundRecorder;
   bool _isRecording = false;
   Codec _codec = Codec.aacADTS;
+  String? _recordingPath;
   List<String> messages = [];
-  int session = 0;
+  int session = -1;
   String preference = "";
   String prefer = "";
   final TextEditingController _chatController = TextEditingController();
@@ -34,766 +35,51 @@ class _ChatPageState extends State<ChatPage> {
   String emotion = "مبسوط";
   String gender = "male";
   String name = "";
-
-  String getGenderSpecificSentence(String sentence) {
-    if (gender == "female") {
-      sentence = sentence
-          .replaceFirst("تعمل", "تعملي")
-          .replaceFirst("تحب", "تحبي")
-          .replaceFirst("عاوز", "عاوزة")
-          .replaceFirst("ليك", "ليكي")
-          .replaceFirst("تروح", "تروحي")
-          .replaceFirst("تسمع", "تسمعي")
-          .replaceFirst("تتفرج", "تتفرجي")
-          .replaceFirst("تلعب", "تلعبي")
-          .replaceFirst("تخرج", "تخرجي")
-          .replaceFirst("جرب", "جربي")
-          .replaceFirst("اختار", "اختاري")
-          .replaceFirst("معاك", "معاكي");
-    }
-    return sentence;
-  }
-
-  String getRandomQuestion() {
-    var questions = [
-      "ايه رأيك نجرب حاجة تانية تحب تخرج؟ ولا حاجه فلبيت بردو (فيلم، أغاني، ولا لعبة)؟",
-      "نغير جو شوية؟ولا تحب نشوف فيلم، نسمع شوية أغاني ولا نلعب حاجة؟",
-      "عندك مزاج لإيه تاني؟ فيلم، أغاني، لعب، خروج ؟"
-    ];
-    var randomIndex = Random().nextInt(questions.length);
-    var question = questions[randomIndex];
-    return getGenderSpecificSentence(question);
-  }
-
-  String getRandomFeedback(String preference, String gender, int age) {
-    final moviePattern = RegExp(r'(افلام|فلام|فلم|فيلم)');
-    final musicPattern = RegExp(r'(اغاني|غاني|غني|غالي|غياني)');
-    final gameBookPattern = RegExp(r'(لعب|لعبه|كتب|لعبة|تاب|تب|ليعب|ليعاب)');
-    final outingPattern = RegExp(r'(انزل|اروح|بره|خرج|خروج|اخرج)');
-
-    if (moviePattern.hasMatch(preference)) {
-      preference = 'افلام';
-    } else if (musicPattern.hasMatch(preference)) {
-      preference = 'اغاني';
-    } else if (outingPattern.hasMatch(preference)) {
-      preference = 'خروج';
-    } else if (gameBookPattern.hasMatch(preference)) {
-      if (age >= 41) {
-        preference = 'كتب';
-      } else {
-        preference = 'لعب';
-      }
-    }
-
-    final feedbackOptions = {
-      'افلام': [
-        "ايه رأيك في الفيلم ده؟",
-        "عجبك الفيلم ده؟",
-        "الفيلم ده مناسب ليك؟"
-      ],
-      'اغاني': [
-        "ايه رأيك في الاغنية دي؟",
-        "عجبتك الاغنية دي؟",
-        "الاغنية دي مناسبة ليك؟"
-      ],
-      'لعب': [
-        "ايه رأيك في اللعبة دي؟",
-        "عجبتك اللعبة دي؟",
-        "اللعبة دي مناسبة ليك؟"
-      ],
-      'كتب': [
-        "ايه رأيك في الكتاب ده؟",
-        "عجبك الكتاب ده؟",
-        "هل الكتاب ده مناسب ليك؟"
-      ],
-      'خروج': [
-        "طب ايه رايك تروح؟",
-        "طب عجبك المكان ده؟",
-        "في مكان ممكن يعجبك اكتر زي"
-      ]
-    };
-
-    var random = Random();
-    var choices = feedbackOptions[preference]!;
-    var choice = choices[random.nextInt(choices.length)];
-    return getGenderSpecificSentence(choice);
-  }
-
-  String? extractName(String text) {
-    List<String> words = text.split(" ");
-    String lastWord = words.last;
-    int totalWords = words.length;
-    RegExp namePattern = RegExp(r'(اسمي|انا|سمي|اسني)');
-
-    print("length : ${totalWords}");
-    print("texticooo : ${text}");
-    print("texticooo : ${lastWord}");
-
-    if (namePattern.hasMatch(text)) {
-      return lastWord;
-    } else if (totalWords == 1) {
-      return text;
-    } else {
-      return null;
-    }
-  }
-
-  String? getEntertainmentSuggestion(
-      int age, String emotion, String userResponse) {
-    final moviePattern = RegExp(r'(افلام|فلام|فلم|فيلم)');
-    final musicPattern = RegExp(r'(اغاني|غاني|غني|غالي|غياني)');
-    final gameBookPattern = RegExp(r'(لعب|لعبه|كتب|لعبة|تاب|تب|ليعب|ليعاب)');
-    final outingPattern = RegExp(r'(انزل|اروح|بره|خرج|خروج|اخرج)');
-
-    String preference;
-    if (moviePattern.hasMatch(userResponse)) {
-      preference = 'افلام';
-    } else if (musicPattern.hasMatch(userResponse)) {
-      preference = 'اغاني';
-    } else if (outingPattern.hasMatch(userResponse)) {
-      preference = 'خروج';
-    } else if (gameBookPattern.hasMatch(userResponse)) {
-      preference = (age >= 41) ? 'كتب' : 'لعب';
-    } else {
-      return getGenderSpecificSentence("جرب تاني و اختار من أربعة");
-    }
-
-    Map<List<int>, Map<String, Map<String, List<String>>>>
-        entertainmentOptions = {
-      [0, 20]: {
-        'مبسوط': {
-          'افلام': [
-            'Toy Story' 'Finding Nemo',
-            'Frozen',
-            'Moana',
-            'The Lion King',
-            'Tangled',
-            'Inside Out',
-            'Zootopia',
-            'Paddington',
-            'The Incredibles'
-          ],
-          'اغاني': [
-            'Happy',
-            'Cant Stop the Feeling!' 'Shake It Off',
-            'Walking on Sunshine',
-            'Uptown Funk',
-            'Best Day of My Life',
-            'I Gotta Feeling',
-            'Waka Waka',
-            'Count on Me',
-            'Roar'
-          ],
-          'لعب': [
-            'Mario Kart 8 Deluxe',
-            'Animal Crossing: New Horizons',
-            'Minecraft',
-            'Super Mario Odyssey',
-            'The Legend of Zelda: Breath of the Wild',
-            'Splatoon 2',
-            'Rocket League',
-            'Rayman Legends',
-            'Just Dance (any version)',
-            'LEGO Marvel Superheroes'
-          ],
-          'خروج': [
-            'سكي مصر',
-            'Air zone',
-            'كيدزانيا',
-            'فاميلي بارك',
-            'فاميلي لاند المعادي',
-            'جيرولاند',
-            'بيلي بيز',
-            'كريزي ووتر',
-            'السيرك القومي',
-            'ماجيك لاند'
-          ]
-        },
-        'متعصب': {
-          'افلام': [
-            'The Lion King',
-            'Matilda',
-            'Inside Out',
-            'Zootopia',
-            'The Incredibles',
-            'How to Train Your Dragon',
-            'Wreck-It Ralph',
-            'Big Hero 6',
-            'Mulan',
-            'Brave'
-          ],
-          'اغاني': [
-            'Eye of the Tiger',
-            'Roar',
-            'Stronger',
-            'Fight Song',
-            'Titanium',
-            'Firework',
-            'Can’t Hold Us',
-            'Hall of Fame',
-            'Brave',
-            'Shake It Off'
-          ],
-          'لعب': [
-            'Super Smash Bros. Ultimate',
-            'Minecraft (PvP modes)',
-            'FIFA 23',
-            'NBA 2K23',
-            'Mario Kart 8 Deluxe',
-            'Splatoon 2',
-            'Overcooked! 2',
-            'Lego Marvel Superheroes',
-            'Rocket League',
-            'Plants vs. Zombies: Garden Warfare 2'
-          ],
-          'خروج': [
-            'سكي مصر',
-            'Air zone',
-            'كيدزانيا',
-            'فاميلي بارك',
-            'فاميلي لاند المعادي',
-            'جيرولاند',
-            'بيلي بيز',
-            'كريزي ووتر',
-            'السيرك القومي',
-            'ماجيك لاند'
-          ]
-        },
-        'حزين': {
-          'افلام': [
-            'Inside Out',
-            'Up',
-            'The Lion King',
-            'Bambi',
-            'Coco',
-            'Finding Nemo',
-            'Toy Story 3',
-            'The Fox and the Hound',
-            'Bridge to Terabithia',
-            'Charlotte’s Web'
-          ],
-          'اغاني': [
-            'When She Loved Me',
-            'Fix You',
-            'Let It Go',
-            'Yesterday',
-            'Hallelujah',
-            'Someone Like You',
-            'See You Again',
-            'Stay',
-            'Skinny Love',
-            'Lost Boy'
-          ],
-          'لعب': [
-            'The Last Guardian',
-            'Ori and the Blind Forest',
-            'Journey',
-            'Celeste',
-            'Undertale',
-            'Life is Strange',
-            'To the Moon',
-            'Spiritfarer',
-            'Graveyard Keeper',
-            'Brothers: A Tale of Two Sons'
-          ],
-          'خروج': [
-            'سكي مصر',
-            'Air zone',
-            'كيدزانيا',
-            'فاميلي بارك',
-            'فاميلي لاند المعادي',
-            'جيرولاند',
-            'بيلي بيز',
-            'كريزي ووتر',
-            'السيرك القومي',
-            'ماجيك لاند'
-          ]
-        },
-        'متفاجئ': {
-          'افلام': [
-            'Toy Story 3',
-            'Big Hero 6',
-            'The Lego Movie',
-            'Monsters, Inc.',
-            'Ratatouille',
-            'The Incredibles',
-            'Wreck-It Ralph',
-            'Shrek',
-            'Frozen',
-            'Spider-Man: Into the Spider-Verse'
-          ],
-          'اغاني': [
-            'Happy',
-            'Cant Stop The Feeling!',
-            'Walking on Sunshine',
-            'Uptown Funk',
-            'Shake It Off',
-            'Best Day of My Life',
-            'Count on Me',
-            'Firework',
-            'Dynamite',
-            'I Gotta Feeling'
-          ],
-          'لعب': [
-            'Among Us',
-            'Minecraft',
-            'The Legend of Zelda: Breath of the Wild',
-            'Super Mario Odyssey',
-            'Rayman Legends',
-            'Animal Crossing: New Horizons',
-            'LittleBigPlanet 3',
-            'Roblox',
-            'Terraria',
-            'Fortnite'
-          ],
-          'خروج': [
-            'سكي مصر',
-            'Air zone',
-            'كيدزانيا',
-            'فاميلي بارك',
-            'فاميلي لاند المعادي',
-            'جيرولاند',
-            'بيلي بيز',
-            'كريزي ووتر',
-            'السيرك القومي',
-            'ماجيك لاند'
-          ]
-        },
-      },
-      [21, 40]: {
-        'مبسوط': {
-          'افلام': [
-            'Amélie',
-            'The Grand Budapest Hotel',
-            'The Secret Life of Walter Mitty',
-            'La La Land',
-            'Midnight in Paris',
-            'Guardians of the Galaxy',
-            'Little Miss Sunshine',
-            'Forrest Gump',
-            'Chef',
-            'The Intouchables'
-          ],
-          'اغاني': [
-            'Happy',
-            'Cant Stop The Feeling!',
-            'Uptown Funk',
-            'Shake It Off',
-            'Best Day of My Life',
-            'I Gotta Feeling',
-            'Get Lucky',
-            'Walking On Sunshine',
-            'Valerie',
-            'Hey Ya!'
-          ],
-          'لعب': [
-            'Stardew Valley',
-            'Animal Crossing: New Horizons',
-            'The Sims 4',
-            'Mario Kart 8 Deluxe',
-            'Overwatch',
-            'Beat Saber',
-            'Journey',
-            'Rocket League',
-            'Terraria',
-            'Minecraft'
-          ],
-          'خروج': [
-            'خان الخليلي',
-            'برج القاهرة',
-            'la casetta مطعم',
-            'نايل كروز',
-            'مطعم بروكار السوري',
-            'dara',
-            'قهوة كونست',
-            'كريزي ووتر ف 6 أكتوبر',
-            'شارع المعز',
-            'مطعم باب القصر',
-            'كشري أبو طارق',
-            'مطعم إنديرا ',
-            'مول مصر',
-            'ملاهي (Malahy)'
-          ]
-        },
-        'متعصب': {
-          'افلام': [
-            'Fight Club',
-            'Mad Max: Fury Road',
-            'The Dark Knight',
-            'Gladiator',
-            'V for Vendetta',
-            '300',
-            'John Wick',
-            'The Wolf of Wall Street',
-            'Kill Bill: Vol. 1',
-            'Snatch'
-          ],
-          'اغاني': [
-            'Eye of the Tiger',
-            'Killing In The Name',
-            'Seven Nation Army',
-            'Bulls On Parade',
-            'Sabotage',
-            'Enter Sandman',
-            'We Will Rock You',
-            'Break Stuff',
-            'Survivor',
-            'Smells Like Teen Spirit'
-          ],
-          'لعب': [
-            'DOOM Eternal',
-            'God of War',
-            'Mortal Kombat 11',
-            'Dark Souls III',
-            'Sekiro: Shadows Die Twice',
-            'Street Fighter V',
-            'Call of Duty: Warzone',
-            'For Honor',
-            'Cuphead',
-            'Hotline Miami'
-          ],
-          'خروج': [
-            'خان الخليلي',
-            'برج القاهرة',
-            'la casetta مطعم',
-            'نايل كروز',
-            'مطعم بروكار السوري',
-            'dara',
-            'قهوة كونست',
-            'كريزي ووتر ف 6 أكتوبر',
-            'شارع المعز',
-            'مطعم باب القصر',
-            'كشري أبو طارق',
-            'مطعم إنديرا ',
-            'مول مصر',
-            'ملاهي (Malahy)'
-          ]
-        },
-        'حزين': {
-          'افلام': [
-            'Eternal Sunshine of the Spotless Mind',
-            'Requiem for a Dream',
-            'The Shawshank Redemption',
-            'Schindler’s List',
-            'Manchester by the Sea',
-            'Her',
-            'Lost in Translation',
-            'The Green Mile',
-            'Grave of the Fireflies',
-            'Blue Valentine'
-          ],
-          'اغاني': [
-            'Someone Like You',
-            'Fix You',
-            'Hallelujah',
-            'Skinny Love',
-            'Nothing Compares 2 U',
-            'With or Without You',
-            'Tears in Heaven',
-            'The Night We Met',
-            'Creep',
-            'Everybody Hurts'
-          ],
-          'لعب': [
-            'The Last of Us',
-            'Life is Strange',
-            'Red Dead Redemption 2',
-            'Hellblade: Senuas Sacrifice',
-            'What Remains of Edith Finch',
-            'Gris',
-            'Death Stranding',
-            'Journey',
-            'Firewatch',
-            'To The Moon'
-          ],
-          'خروج': [
-            'خان الخليلي',
-            'برج القاهرة',
-            'la casetta مطعم',
-            'نايل كروز',
-            'مطعم بروكار السوري',
-            'dara',
-            'قهوة كونست',
-            'كريزي ووتر ف 6 أكتوبر',
-            'شارع المعز',
-            'مطعم باب القصر',
-            'كشري أبو طارق',
-            'مطعم إنديرا ',
-            'مول مصر',
-            'ملاهي (Malahy)'
-          ]
-        },
-        'متفاجئ': {
-          'افلام': [
-            'Inception',
-            'The Sixth Sense',
-            'The Prestige',
-            'Fight Club',
-            'Memento',
-            'Shutter Island',
-            'Gone Girl',
-            'Oldboy',
-            'The Others',
-            'Se7en'
-          ],
-          'اغاني': [
-            'Bohemian Rhapsody',
-            'Rolling in the Deep',
-            'Somebody That I Used to Know',
-            'Lose Yourself',
-            'Thriller',
-            'Dont Stop Believin',
-            'Pumped Up Kicks',
-            'Take Me to Church',
-            'Bad Guy',
-            'Blinding Lights'
-          ],
-          'لعب': [
-            'Bioshock',
-            'The Witcher 3: Wild Hunt',
-            'Portal 2',
-            'Undertale',
-            'Metal Gear Solid V: The Phantom Pain',
-            'Bloodborne',
-            'Control',
-            'The Stanley Parable',
-            'Inside',
-            'Return of the Obra Dinn'
-          ],
-          'خروج': [
-            'خان الخليلي',
-            'برج القاهرة',
-            'la casetta مطعم',
-            'نايل كروز',
-            'مطعم بروكار السوري',
-            'dara',
-            'قهوة كونست',
-            'كريزي ووتر ف 6 أكتوبر',
-            'شارع المعز',
-            'مطعم باب القصر',
-            'كشري أبو طارق',
-            'مطعم إنديرا ',
-            'مول مصر',
-            'ملاهي (Malahy)'
-          ]
-        },
-      },
-      [41, 80]: {
-        'مبسوط': {
-          'افلام': [
-            'Forrest Gump',
-            'The Sound of Music',
-            'Amélie',
-            'It’s a Wonderful Life',
-            'Mamma Mia!',
-            'When Harry Met Sally',
-            'Chocolat',
-            'Under the Tuscan Sun',
-            'My Big Fat Greek Wedding',
-            'The Best Exotic Marigold Hotel'
-          ],
-          'اغاني': [
-            'Dancing Queen',
-            'Here Comes The Sun',
-            'Brown Eyed Girl',
-            'September',
-            'Don’t Worry Be Happy',
-            'Uptown Girl',
-            'Sweet Caroline',
-            'Good Vibrations',
-            'Isnt She Lovely',
-            'I Got You (I Feel Good)'
-          ],
-          'كتب': [
-            'The Rosie Project',
-            'A Man Called Ove',
-            'Eat, Pray, Love',
-            'The Unlikely Pilgrimage of Harold Fry',
-            'Bridget Jones s Diary',
-            'The No. 1 Ladies Detective Agency',
-            'Major Pettigrews Last Stand',
-            'The Guernsey Literary and Potato Peel Pie Society',
-            'The Bookshop on the Corner'
-          ],
-          'خروج': [
-            'خان الخليلي',
-            'قهوة الفيشاوي',
-            'دار الأوبرا',
-            'نايل كروز',
-            'جروبي',
-            'دار الأوبرا',
-            'نادي الجزيرة'
-          ]
-        },
-        'متعصب': {
-          'افلام': [
-            'Network',
-            '12 Angry Men',
-            'Gran Torino',
-            'The Godfather',
-            'Raging Bull',
-            'One Flew Over the Cuckoo’s Nest',
-            'Gladiator',
-            'Taxi Driver',
-            'A Few Good Men',
-            'Braveheart'
-          ],
-          'اغاني': [
-            'Born in the U.S.A.',
-            'Another Brick in the Wall',
-            'Fortunate Son',
-            'American Idiot',
-            'We Will Rock You',
-            'Fight the Power',
-            'Bad Moon Rising',
-            'Walk This Way',
-            'Back In Black',
-            'Should I Stay or Should I Go'
-          ],
-          'كتب': [
-            '1984',
-            'The Grapes of Wrath',
-            'To Kill a Mockingbird',
-            'Fahrenheit 451',
-            'Animal Farm',
-            'Lord of the Flies',
-            'The Handmaid’s Tale',
-            'Catch-22',
-            'Brave New World',
-            'The Road'
-          ],
-          'خروج': [
-            'خان الخليلي',
-            'قهوة الفيشاوي',
-            'دار الأوبرا',
-            'نايل كروز',
-            'جروبي',
-            'دار الأوبرا',
-            'نادي الجزيرة'
-          ]
-        },
-        'حزين': {
-          'افلام': [
-            'Schindler’s List',
-            'The Green Mile',
-            'Terms of Endearment',
-            'Saving Private Ryan',
-            'Philadelphia',
-            'Titanic',
-            'Brokeback Mountain',
-            'The Color Purple',
-            'Ordinary People',
-            'Kramer vs. Kramer'
-          ],
-          'اغاني': [
-            'Tears in Heaven',
-            'Yesterday',
-            'Bridge Over Troubled Water',
-            'Hallelujah',
-            'Candle in the Wind',
-            'Let It Be',
-            'Nothing Compares 2 U',
-            'Everybody Hurts',
-            'I Will Always Love You',
-            'Unchained Melody'
-          ],
-          'كتب': [
-            'The Kite Runner',
-            'Atonement',
-            'The Road',
-            'The Lovely Bones',
-            'Revolutionary Road',
-            'Never Let Me Go',
-            'Beloved',
-            'Norwegian Wood',
-            'The Light Between Oceans',
-            'The Remains of the Day'
-          ],
-          'خروج': [
-            'خان الخليلي',
-            'قهوة الفيشاوي',
-            'دار الأوبرا',
-            'نايل كروز',
-            'جروبي',
-            'دار الأوبرا',
-            'نادي الجزيرة'
-          ]
-        },
-        'متفاجئ': {
-          'افلام': [
-            'The Sixth Sense',
-            'Psycho',
-            'The Usual Suspects',
-            'Fight Club',
-            'Memento',
-            'Gone Girl',
-            'The Others',
-            'Primal Fear',
-            'Shutter Island',
-            'The Prestige'
-          ],
-          'اغاني': [
-            'Bohemian Rhapsody',
-            'Stairway to Heaven',
-            'Hotel California',
-            'Like a Rolling Stone',
-            'Thunderstruck',
-            'Baba O’Riley',
-            'Layla',
-            'Space Oddity',
-            'American Pie',
-            'Go Your Own Way'
-          ],
-          'كتب': [
-            'Gone Girl',
-            'The Girl with the Dragon Tattoo',
-            'Shutter Island',
-            'The Da Vinci Code',
-            'The Murder of Roger Ackroyd',
-            'Big Little Lies',
-            'I Am Watching You',
-            'The Silent Patient',
-            'The Woman in the Window',
-            'Before I Go to Sleep'
-          ],
-          'خروج': [
-            'خان الخليلي',
-            'قهوة الفيشاوي',
-            'دار الأوبرا',
-            'نايل كروز',
-            'جروبي',
-            'دار الأوبرا',
-            'نادي الجزيرة'
-          ]
-        }
-      }
-    };
-
-    for (var ageRange in entertainmentOptions.keys) {
-      if (ageRange[0] <= age && age <= ageRange[1]) {
-        var optionsByEmotion = entertainmentOptions[ageRange]?[emotion];
-        if (optionsByEmotion != null &&
-            optionsByEmotion.containsKey(preference)) {
-          var choices = optionsByEmotion[preference];
-          if (choices != null && choices.isNotEmpty) {
-            return getGenderSpecificSentence(
-                choices[Random().nextInt(choices.length)]);
-          }
-        }
-      }
-    }
-    return null;
-  }
+  FlutterSoundRecorder recorder = FlutterSoundRecorder();
+  bool isRecorderReady = false;
 
   @override
   void initState() {
     super.initState();
+    String starter = getRandomConversationStarter();
     _chatHistory.add({
       "time": DateTime.now(),
       "isshown": false,
-      "message": "اهلا اهلا اسمك ايه؟",
+      "message": getGenderSpecificSentence(starter, gender),
       "isSender": false,
     });
+    initRecorder();
+  }
+
+  Future initRecorder() async {
+    final status = await Permission.microphone.request();
+
+    if (status == PermissionStatus.granted) {
+      await recorder.openRecorder();
+      isRecorderReady = true;
+    }
+    if (status != PermissionStatus.granted) {
+      throw 'Microphone permission not granted';
+    }
+
+    final session = await AudioSession.instance;
+    await session.configure(AudioSessionConfiguration(
+      avAudioSessionCategory: AVAudioSessionCategory.playAndRecord,
+      avAudioSessionCategoryOptions:
+          AVAudioSessionCategoryOptions.allowBluetooth |
+              AVAudioSessionCategoryOptions.defaultToSpeaker,
+      avAudioSessionMode: AVAudioSessionMode.spokenAudio,
+      avAudioSessionRouteSharingPolicy:
+          AVAudioSessionRouteSharingPolicy.defaultPolicy,
+      avAudioSessionSetActiveOptions: AVAudioSessionSetActiveOptions.none,
+      androidAudioAttributes: const AndroidAudioAttributes(
+        contentType: AndroidAudioContentType.speech,
+        flags: AndroidAudioFlags.none,
+        usage: AndroidAudioUsage.voiceCommunication,
+      ),
+      androidAudioFocusGainType: AndroidAudioFocusGainType.gain,
+      androidWillPauseWhenDucked: true,
+    ));
   }
 
   void updateConversation(String text) {
@@ -801,16 +87,26 @@ class _ChatPageState extends State<ChatPage> {
       _chatHistory.add({
         "time": DateTime.now(),
         "isshown": false,
-        "message": "$text",
+        "message": text,
         "isSender": true,
       });
-      if (session == 0) {
+      if (session == 0 || session == -1) {
+        if (session == -1) {
+          _chatHistory.add({
+            "time": DateTime.now(),
+            "isshown": false,
+            "message": "ممكن اعرف اسمك الاول؟",
+            "isSender": false,
+          });
+          session = 0;
+          return;
+        }
         if (extractName(text) == null) {
           _chatHistory.add({
             "time": DateTime.now(),
             "isshown": false,
             "message":
-                "${getGenderSpecificSentence('مش عارف اسمك، اسمك ايه؟')}",
+                getGenderSpecificSentence('مسمعتش اسمك، اسمك ايه؟', gender),
             "isSender": false,
           });
           return;
@@ -822,33 +118,39 @@ class _ChatPageState extends State<ChatPage> {
         _chatHistory.add({
           "time": DateTime.now(),
           "isshown": false,
-          "message": "${getGenderSpecificSentence(greeting)}",
+          "message": getGenderSpecificSentence(greeting, gender),
           "isSender": false,
         });
         session = 2;
-        return; // Wait for next user input
+        return;
       }
       if (session == 2) {
-        preference = text; // Capture preference
+        preference = text;
         prefer = preference;
         String? suggestion =
-            getEntertainmentSuggestion(age, emotion, preference);
+            getEntertainmentSuggestion(age, emotion, preference, gender);
         if (suggestion!.startsWith("جرب تاني") ||
             suggestion.startsWith("جربي تاني")) {
-          print("within");
+          suggestion = getRandomTryAgainMessage();
           _chatHistory.add({
             "time": DateTime.now(),
             "isshown": false,
-            "message": "$suggestion",
+            "message": getGenderSpecificSentence(suggestion, gender),
             "isSender": false,
           });
           return;
         } else {
-          String feedback_question = getRandomFeedback(preference, gender, age);
+          String feedbackQuestion = getRandomFeedback(preference, gender, age);
           _chatHistory.add({
             "time": DateTime.now(),
             "isshown": false,
-            "message": "${suggestion}، ${feedback_question}",
+            "message": feedbackQuestion,
+            "isSender": false,
+          });
+          _chatHistory.add({
+            "time": DateTime.now(),
+            "isshown": false,
+            "message": suggestion,
             "isSender": false,
           });
           session = 3;
@@ -861,20 +163,21 @@ class _ChatPageState extends State<ChatPage> {
           _chatHistory.add({
             "time": DateTime.now(),
             "isshown": false,
-            "message":
-                "${getGenderSpecificSentence('عاوز اقتراح تاني لنشاط غير ده؟')}",
+            "message": getGenderSpecificSentence(
+                'عاوز اقتراح تاني لنشاط غير ده؟', gender),
             "isSender": false,
           });
           prefer = "";
           session = 4;
           return;
         } else {
-          String? suggestion = getEntertainmentSuggestion(age, emotion, prefer);
-          String feedback_question = getRandomFeedback(prefer, gender, age);
+          String? suggestion =
+              getEntertainmentSuggestion(age, emotion, prefer, gender);
+          String feedbackQuestion = getRandomFeedback(prefer, gender, age);
           _chatHistory.add({
             "time": DateTime.now(),
             "isshown": false,
-            "message": "${suggestion}، ${feedback_question}",
+            "message": "$suggestion، $feedbackQuestion",
             "isSender": false,
           });
           return;
@@ -886,7 +189,8 @@ class _ChatPageState extends State<ChatPage> {
           _chatHistory.add({
             "time": DateTime.now(),
             "isshown": false,
-            "message": "${getGenderSpecificSentence(getRandomQuestion())}",
+            "message":
+                getGenderSpecificSentence(getRandomQuestion(gender), gender),
             "isSender": false,
           });
           session = 2;
@@ -895,8 +199,8 @@ class _ChatPageState extends State<ChatPage> {
           _chatHistory.add({
             "time": DateTime.now(),
             "isshown": false,
-            "message":
-                "${getGenderSpecificSentence('تشرفنا بالكلام معاك، يوم سعيد!')}",
+            "message": getGenderSpecificSentence(
+                'تشرفنا بالكلام معاك، يوم سعيد!', gender),
             "isSender": false,
           });
           session = 0;
@@ -908,6 +212,10 @@ class _ChatPageState extends State<ChatPage> {
 
   @override
   void dispose() {
+    if (recorder.isRecording) {
+      recorder.stopRecorder();
+    }
+    recorder.closeRecorder();
     _scrollController.dispose();
     super.dispose();
   }
@@ -917,7 +225,7 @@ class _ChatPageState extends State<ChatPage> {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _scrollController.animateTo(
           _scrollController.position.maxScrollExtent,
-          duration: Duration(milliseconds: 200),
+          duration: const Duration(milliseconds: 200),
           curve: Curves.easeOut,
         );
       });
@@ -925,10 +233,70 @@ class _ChatPageState extends State<ChatPage> {
   }
 
   void handleUserInput(String input) {
-    print("aaaaaaaaaaaaa session : ${session}");
+    // ignore: avoid_print
+    print("aaaaaaaaaaaaa session : $session");
     updateConversation(input);
     _scrollToEnd();
     _chatController.clear();
+  }
+
+  Future<void> _handleRecord() async {
+    try {
+      if (_isRecording) {
+        // Check if it is already recording
+        final path = await recorder.stopRecorder();
+        setState(() {
+          _isRecording = false;
+          _recordingPath = path;
+        });
+        print('Recording stopped and saved to: $_recordingPath');
+        if (_recordingPath != null) {
+          await sendFile(_recordingPath!);
+        }
+      } else {
+        // Ensure permissions are granted
+        final status = await Permission.microphone.request();
+        if (status != PermissionStatus.granted) {
+          throw 'Microphone permission not granted';
+        }
+        final dir = await getApplicationDocumentsDirectory();
+        _recordingPath =
+            '${dir.path}/${DateTime.now().millisecondsSinceEpoch}.aac';
+
+        await recorder.startRecorder(toFile: _recordingPath);
+        setState(() {
+          _isRecording = true;
+        });
+      }
+    } catch (e) {
+      print('Failed to record: $e');
+      setState(() {
+        _isRecording = false;
+      });
+    }
+  }
+
+  Future<void> sendFile(String filePath) async {
+    var uri = Uri.parse('https://7072-102-43-79-150.ngrok-free.app/transcribe');
+    var request = http.MultipartRequest('POST', uri);
+
+    request.files.add(await http.MultipartFile.fromPath('file', filePath));
+
+    try {
+      var streamedResponse = await request.send();
+      var response = await http.Response.fromStream(streamedResponse);
+      if (response.statusCode == 200) {
+        print('File successfully sent!');
+        var data = json.decode(response.body);
+        var transcription = data['transcription'];
+        String combinedTranscription = transcription.join(" ");
+        handleUserInput(combinedTranscription);
+      } else {
+        print('Failed to send file, status code: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Error sending file: $e');
+    }
   }
 
   @override
@@ -941,7 +309,7 @@ class _ChatPageState extends State<ChatPage> {
         title: Text(
           "Chat",
           style: GoogleFonts.aboreto(
-            textStyle: TextStyle(
+            textStyle: const TextStyle(
               color: Colors.black,
               fontSize: 20,
               fontWeight: FontWeight.bold,
@@ -1097,8 +465,8 @@ class _ChatPageState extends State<ChatPage> {
                           children: [
                             IconButton(
                               icon: Icon(_isRecording ? Icons.stop : Icons.mic),
-                              onPressed: () {
-                                _isRecording = !_isRecording;
+                              onPressed: () async {
+                                await _handleRecord();
                               },
                             ),
                             Expanded(

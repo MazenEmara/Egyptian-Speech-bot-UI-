@@ -34,11 +34,11 @@ flutter run
 
 1️⃣ Open the app and tap the microphone button.2️⃣ Speak in Egyptian Arabic, and watch the app transcribe your words in real-time.3️⃣ Tap copy or share to export your text.4️⃣ Customize settings (e.g., dark mode, sensitivity) in the Settings section.
 
-🧠 About the Speech Recognition Model
+**🧠 About the Speech Recognition Model**
 
 🔹 Custom-built for Egyptian Arabic – Trained on a dataset specifically tailored to local dialects.🔹 Optimized for speed & accuracy – Delivers quick and precise results.🔹 Designed for mobile devices – state-of-art performance on the EACSC dataset.
 
-🤝 Contributing
+**🤝 Contributing**
 
 💡 Want to improve this project? Contributions are welcome!
 
@@ -48,11 +48,11 @@ Suggest new features via pull requests.
 
 Enhance the model by contributing better training data.
 
-📜 License
+**📜 License**
 
 📝 This project is licensed under the MIT License – see the LICENSE file for details.
 
-📩 Contact & Support
+**📩 Contact & Support**
 
 💬 Have questions or need support? Feel free to reach out:📧 Email: mazen.emara01@gmail.com🔗 LinkedIn: linkedin.com/in/mazen-emara-126565279
 

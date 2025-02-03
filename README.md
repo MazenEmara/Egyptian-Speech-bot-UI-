@@ -10,8 +10,10 @@ Bringing Accurate and Real-Time Egyptian Arabic Speech-to-Text to Mobile
 
 📸 Screenshots
 
-![app1](https://github.com/user-attachments/assets/9233058f-6cb4-49c2-833a-f48d83332021) ![app2](https://github.com/user-attachments/assets/70250acd-1596-4628-adc6-c668e3cc2fd2) !
-
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/9233058f-6cb4-49c2-833a-f48d83332021" width="300"/>
+  <img src="https://github.com/user-attachments/assets/70250acd-1596-4628-adc6-c668e3cc2fd2" width="300"/>
+</p>
 
 📥 Installation & Setup
 
